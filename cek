@@ -147,37 +147,32 @@ response = requests.put(url, headers=headers, json=data)
 print(response.json())
 
 # Mengambil ID dari video.txt untuk mencari data video
-def get_video_id():
-    # Mengambil ID dari video.txt
-    with open("video.txt", "r") as file:
-        lines = file.readlines()
-        last_line = lines[-1].strip()
-        url = "https://app.api.30sec.net/v1/content/Advert/" + last_line
+with open("video.txt", "r") as file:
+    lines = file.readlines()
+    last_line = lines[-1].strip()
+    url = "https://app.api.30sec.net/v1/content/Advert/" + last_line
 
-    # Menghapus baris terakhir dalam file video.txt
-    with open("video.txt", "w") as file:
-        file.writelines(lines[:-1])
+# Menghapus baris terakhir dalam file video.txt
+with open("video.txt", "w") as file:
+    file.writelines(lines[:-1])
 
-    return url
+# Headers
+headers = {
+    "Authorization": bearer_token + token,
+    "User-Agent": user_agent,
+    "s": "",
+    "version": "2.1.1",
+    "Host": "app.api.30sec.net",
+    "Connection": "Keep-Alive",
+    "Accept-Encoding": "gzip"
+}
 
-def export_data(url):
-    # Headers
-    headers = {
-        "Authorization": bearer_token + token,
-        "User-Agent": user_agent,
-        "s": "",
-        "version": "2.1.1",
-        "Host": "app.api.30sec.net",
-        "Connection": "Keep-Alive",
-        "Accept-Encoding": "gzip"
-    }
-
-    # Mengirim permintaan GET ke URL API
-    response = requests.get(url, headers=headers)
-    data = response.json()
+# Mengirim permintaan GET ke URL API
+response = requests.get(url, headers=headers)
+data = response.json()
 
 # Menyimpan data yang diperlukan dalam variabel
-id = data["id"]
+id= data["data"]["id"]
 content_video_url = data["data"]["contentVideoUrl"]
 duration = data["data"]["duration"]
 name = data["data"]["name"]
@@ -191,26 +186,10 @@ print("id:", id)
 print("Video URL:", content_video_url)
 print("Duration:", duration, "seconds")
 print("Name:", name)
-print("English Name:", englishName)
+print("englishName:", englishName)
+
 print("Question ID:", question_id)
 print("Question Content:", question_content)
-print("Answer List:")
-for answer in answer_list:
-    answer_id = answer["id"]
-print("Daftar Jawaban:")
-for answer in answer_list:
-    answer_id = answer["id"]
-    answer_text = answer["answer"]
-    print("ID Jawaban {}: Teks Jawaban: {}".format(answer_id, answer_text))
-
-# Menginisialisasi answer_list sebagai list dictionary
-answer_list = [
-    {"id": 1, "answer": "Jawaban 1"},
-    {"id": 2, "answer": "Jawaban 2"},
-    {"id": 3, "answer": "Jawaban 3"}
-]
-
-# Menampilkan daftar jawaban
 print("Answer List:")
 for answer in answer_list:
     answer_id = answer["id"]
@@ -219,57 +198,75 @@ for answer in answer_list:
 
 # Mencari kata yang sama
 similar_answers = []
+
+# Mencari jawaban yang memiliki kata yang sama dengan `name` atau `englishName`
 for answer in answer_list:
     answer_id = answer["id"]
     answer_text = answer["answer"]
 
-    if name.lower() in answer_text.lower() or englishName.lower() in answer_text.lower():
-        words = answer_text.split()
-        same_word_count = 0
+    if (name.lower() in answer_text.lower() or englishName.lower() in answer_text.lower()) and answer_text.lower() != "ocean":
+        similar_answers.append((answer_text, answer_id))
 
-        for word in words:
-            if word.lower() == name.lower() or word.lower() == englishName.lower():
-                same_word_count += 1
-
-        if same_word_count == 1:
-            similar_answer_text = "Nilai sama"
-            similar_answers.append((similar_answer_text, question_id))
-
-# Menulis hasil ke file answer.txt
+# Menulis jawaban-jawaban yang diekspor ke dalam file answer.txt
 with open("answer.txt", "w") as file:
-    for answer, question_id in similar_answers:
-        file.write("{} {} {}\n".format(answer, question_id, content_video_url))
+    for similar_answer, answer_id in similar_answers:
+        file.write(f"{similar_answer}\n")
+        file.write(f"{question_id}\n")
+        file.write(f"{content_video_url}\n")
 
+# Menampilkan jawaban-jawaban yang diekspor
+for similar_answer, _ in similar_answers:
+    print(similar_answer)
 
-def watch_video(duration):
-    with open("answer.txt", "r") as file:
-        lines = file.readlines()
-        url = lines[-1].split()[2]
+# Memulai Nonton Video
+url = "https://app.api.30sec.net/v1/user/UserOperation"
+headers = {
+    "Authorization": bearer_token + token,
+    "User-Agent": user_agent,
+    "s": "",
+    "version": "2.1.1",
+    "Content-Type": "application/json; charset=UTF-8",
+    "Host": "app.api.30sec.net",
+    "Connection": "Keep-Alive",
+    "Accept-Encoding": "gzip"
+}
+payload = {
+    "couponExpiredPush": False,
+    "couponId": 0,
+    "email": "",
+    "focusBrandPush": False,
+    "originPlatform": "1",
+    "osType": "Android",
+    "phoneNum": "",
+    "targetId": '',
+    "type": ''
+}
 
-    file_name = "video.mp4"
-    response = requests.get(url, stream=True)
-    with open(file_name, "wb") as f:
-        for chunk in response.iter_content(chunk_size=256):
-            f.write(chunk)
+response = requests.post(url, headers=headers, json=payload)
 
-    os.system(f"mpv {file_name} --end={duration} && sleep 5")
-    print("Video selesai!")
+if response.status_code == 200:
+    result = response.json()
+    print(result["message"])
+else:
+    print("Gagal memulai misi menonton.")
 
+# Nonton Video
+with open("answer.txt", "r") as file:
+    lines = file.readlines()
+    url = lines[2]
 
-def main():
-    while True:
-        url = get_video_id()
-        duration = export_data(url)
-        
-        if duration:
-            watch_video(duration)
-            break
-        else:
-            print("Gagal menyimpan URL video.")
+file_name = "video.mp4"
 
+response = requests.get(url, stream=True)
 
-if __name__ == "__main__":
-    main()
+with open(file_name, "wb") as f:
+    for chunk in response.iter_content(chunk_size=1024):
+        f.write(chunk)
+
+os.system(f"mpv {file_name} --end={duration + 10}")
+
+# Lanjutan program setelah menonton video
+print("Video selesai!")
 
 
 # Menutup Misi
@@ -291,28 +288,26 @@ payload = {
     'originPlatform': '1',
     'osType': 'Android',
     'phoneNum': '',
-    'targetId': str(id),  # Mengubah fungsi id menjadi string
-    'type': '203'
+    'targetId': '',
+    'type': ''
 }
 
 response = requests.post(url, headers=headers, json=payload)
 
 if response.status_code == 200:
-    print("Misi ditutup berhasil")
+    print("Misi menonton ditutup berhasil.")
 else:
-    print("Terjadi kesalahan dalam menutup misi")
-
+    print("Terjadi kesalahan dalam menutup misi menonton.")
 
 # Menjawab Pertanyaan dengan Membaca isi file answer.txt
 with open("answer.txt", "r") as file:
     lines = file.readlines()
 
 # Mengambil kata kedua pada line terakhir sebagai questionId
-last_line = lines[-1].strip().split()
-questionId = last_line[1]
+questionId = lines[1]
 
 # Mengambil kata pertama pada line terakhir sebagai jawaban
-answer = last_line[0]
+answer = lines[0]
 
 # Memasukkan nilai jawaban dan questionId ke dalam payload
 payload = {
